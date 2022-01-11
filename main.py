@@ -54,12 +54,12 @@ class Speaker:
             with open(audio_file, "wb") as out:
                 out.write(response.audio_content)
 
-            os.system(f'ffmpeg -i "{audio_file}" '
+            os.system(f'ffmpeg -loglevel quiet -i "{audio_file}" '
                 f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
                 f'"{audio_file_pp}" -y')
             os.remove(audio_file)
         
-        os.system(f'mpv "{audio_file_pp}"')
+        os.system(f'mpv --no-resume-playback "{audio_file_pp}" > /dev/null')
 
 
 class Alice(Speaker):
