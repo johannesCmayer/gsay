@@ -30,6 +30,7 @@ locks_dir.mkdir(exist_ok=True)
 parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
 parser.add_argument('--speed', type=float, help="Speed of the generated voice")
 parser.add_argument('--pitch', type=float, help="Pitch of the generated voice")
+parser.add_argument('--debug', action='store_true', help="Activate debug mode")
 parser.add_argument('text',  type=str, nargs='+', help='sum the integers (default: find the max)')
 
 args = parser.parse_args()
@@ -38,6 +39,10 @@ args.text = " ".join(args.text)
 
 female_wavenet_voices_us = [f"en-US-Wavenet-{voice}" for voice in ["C","E","F","G","H"]]
 female_standard_voices_us = [f"en-US-Standard-{voice}" for voice in ["F"]]
+
+def debug_notify(msg):
+    if args.debug:
+        os.system(f"notify-send '{msg}'")
 
 def wait_for_lock():
     for lock in wait_locks:
@@ -89,7 +94,7 @@ class Speaker:
 
         speed_coef = MIN_SPEED + (len(list(locks_dir.iterdir())) - 1) / UPPER_RANGE * (MAX_SPEED - MIN_SPEED)
         speed_coef = min(MAX_SPEED, max(MIN_SPEED, speed_coef))
-        os.system(f'notify-send "speedup: {speed_coef}"')
+        debug_notify(f"speedup: {speed_coef}")
 
         os.system(f'mpv --speed {speed_coef} --no-resume-playback "{audio_file_pp}" > /dev/null')
         lock_file.unlink()
