@@ -9,8 +9,11 @@ import os
 import argparse
 import datetime
 import time
+
+import yaml
 import click
 from google.cloud import texttospeech
+from google.auth.api_key import Credentials
 
 def get_timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
@@ -23,7 +26,10 @@ audio_dir = project_dir / 'audio_file_cache'
 locks_dir = project_dir / 'locks'
 lock_file = locks_dir / id
 
+audio_dir.mkdir(exist_ok=True)
 locks_dir.mkdir(exist_ok=True)
+
+api_key = yaml.load(open(project_dir / 'api_key.yaml', 'r'), Loader=yaml.FullLoader)
 
 
 # Arguments
@@ -65,14 +71,12 @@ class Speaker:
         audio_file = f"{audio_dir}/{file_name}.mp3"
         audio_file_pp = f"{audio_dir}/{file_name}_pp.mp3"
 
-        client = texttospeech.TextToSpeechClient()
+        client = texttospeech.TextToSpeechClient(credentials=Credentials(api_key))
         synthesis_input = texttospeech.SynthesisInput(text=text)
-        
+
         response = client.synthesize_speech(
             input=synthesis_input, voice=self.voice, audio_config=self.audio_config
         )
-
-        Path(audio_dir).mkdir(parents=True, exist_ok=True)
 
         if not os.path.isdir(audio_dir):
             os.mkdir(audio_dir, )
@@ -96,7 +100,7 @@ class Speaker:
         speed_coef = min(MAX_SPEED, max(MIN_SPEED, speed_coef))
         debug_notify(f"speedup: {speed_coef}")
 
-        os.system(f'mpv --speed {speed_coef} --no-resume-playback "{audio_file_pp}" > /dev/null')
+        os.system(f'mpv --speed={speed_coef} --no-resume-playback "{audio_file_pp}"')
         lock_file.unlink()
         os.remove(audio_file_pp)
 
@@ -156,4 +160,5 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        lock_file.unlink()
+        if lock_file.is_file():
+            lock_file.unlink()
