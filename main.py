@@ -7,24 +7,12 @@ Note: ssml must be well-formed according to:
 from pathlib import Path
 import os
 import argparse
+import subprocess
 import click
 from google.cloud import texttospeech
 
-
-#parser = argparse.ArgumentParser(description='Process some integers.')
-#parser.add_argument('text', const=sum, default="No text was given.",
-#                    help='sum the integers (default: find the max)')
-
-
 project_dir = os.path.dirname(os.path.realpath(__file__))
 audio_cache_dir = f"{project_dir}/audio_file_cache"
-
-# Build the voice request, select the language code ("en-US") and the ssml
-# voice gender ("neutral")
-# TODO use this
-female_wavenet_voices_us = [f"en-US-Wavenet-{voice}" for voice in ["C","E","F","G","H"]]
-female_standard_voices_us = [f"en-US-Standard-{voice}" for voice in ["F"]]
-tempo = 1
 
 class Speaker:
     def __init__(self):
@@ -33,7 +21,6 @@ class Speaker:
     def speak(self, text=None, ssml=None):
         if ssml is not None:
             raise NotImplemented()
-        #ssml = '<prosody rate="slow" pitch="2st">Can you hear me now? Yes, that is right! I am here.</prosody>'
 
         cache_dir = f"{audio_cache_dir}/{self.unique_name}"
         audio_file = f"{cache_dir}/{text}.mp3"
@@ -78,10 +65,38 @@ class Alice(Speaker):
             pitch = 1,
             volume_gain_db = 0,
             sample_rate_hertz = 44100,
-            #"effectsProfileId": [
-            #    string
-            #]
         )
+
+class Koko:
+    def __init__(self):
+        self.unique_name = "Koko"
+    def speak(self, text):
+        proc = subprocess.Popen(['say', text], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc.wait()
+        response = proc.communicate()
+
+        cache_dir = f"{audio_cache_dir}/{self.unique_name}"
+        audio_file = f"{cache_dir}/{text}.mp3"
+        audio_file_pp = f"{cache_dir}/{text}_pp.mp3"
+
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+
+        if not os.path.isdir(audio_cache_dir):
+            os.mkdir(audio_cache_dir, )
+        with open(audio_file, "wb") as out:
+            out.write(response.audio_content)
+
+        os.system(f'ffmpeg -loglevel quiet -i "{audio_file}" '
+            f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
+            f'"{audio_file_pp}" -y')
+        os.remove(audio_file)
+        if not os.path.isfile(audio_file_pp):
+            os.system(f'ffmpeg -loglevel quiet -i "{audio_file}" '
+                f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
+                f'"{audio_file_pp}" -y')
+            os.remove(audio_file)
+        
+        os.system(f'mpv --no-resume-playback "{audio_file_pp}" > /dev/null')
 
 class Test(Speaker):
     def __init__(self):
@@ -108,7 +123,7 @@ class Test(Speaker):
 def main(text):
     text = " ".join(text)
 
-    speaker = Alice()
+    speaker = Koko()
     speaker.speak(text)
 
 if __name__ == "__main__":
