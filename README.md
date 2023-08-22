@@ -1,2 +1,2 @@
 # gsay
-Nightcored Google TTS
+Nightcored Google TTS CLI program.
