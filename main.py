@@ -8,7 +8,9 @@ from pathlib import Path
 import os
 import argparse
 import datetime
+import shutil
 import time
+from glob import glob
 
 import yaml
 import click
@@ -36,12 +38,21 @@ api_key = yaml.load(open(project_dir / 'api_key.yaml', 'r'), Loader=yaml.FullLoa
 parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
 parser.add_argument('--speed', type=float, help="Speed of the generated voice")
 parser.add_argument('--pitch', type=float, help="Pitch of the generated voice")
+parser.add_argument('--clear-locks', action='store_true', help="Clear all the locks.")
 parser.add_argument('--debug', action='store_true', help="Activate debug mode")
-parser.add_argument('text',  type=str, nargs='+', help='sum the integers (default: find the max)')
+parser.add_argument('-o', '--output-file', type=Path, help="Output to this file instead of playing it.")
+parser.add_argument('text',  type=str, nargs='*', help='sum the integers (default: find the max)')
 
 args = parser.parse_args()
 args.text = " ".join(args.text)
 
+if args.clear_locks:
+    for f in locks_dir.iterdir():
+        f.unlink()
+    exit(0)
+
+if args.text == "":
+    raise ValueError("No text to speak was provided.")
 
 female_wavenet_voices_us = [f"en-US-Wavenet-{voice}" for voice in ["C","E","F","G","H"]]
 female_standard_voices_us = [f"en-US-Standard-{voice}" for voice in ["F"]]
@@ -87,6 +98,11 @@ class Speaker:
             f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
             f'"{audio_file_pp}" -y')
         os.remove(audio_file)
+
+        if args.output_file is not None:
+            lock_file.unlink()
+            shutil.move(audio_file_pp, args.output_file)
+            return
         
         wait_for_lock()
 
