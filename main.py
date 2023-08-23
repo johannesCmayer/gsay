@@ -9,8 +9,10 @@ import os
 import argparse
 import datetime
 import shutil
+import signal
 import time
 from glob import glob
+import subprocess
 
 import yaml
 import click
@@ -54,9 +56,6 @@ if args.clear_locks:
 if args.text == "":
     raise ValueError("No text to speak was provided.")
 
-female_wavenet_voices_us = [f"en-US-Wavenet-{voice}" for voice in ["C","E","F","G","H"]]
-female_standard_voices_us = [f"en-US-Standard-{voice}" for voice in ["F"]]
-
 def debug_notify(msg):
     if args.debug:
         os.system(f"notify-send '{msg}'")
@@ -72,11 +71,7 @@ class Speaker:
     def __init__(self):
         pass
 
-    def speak(self, text=None, ssml=None):
-        if ssml is not None:
-            raise NotImplemented()
-        #ssml = '<prosody rate="slow" pitch="2st">Can you hear me now? Yes, that is right! I am here.</prosody>'
-
+    def speak(self, text=None):
         file_name = id
 
         audio_file = f"{audio_dir}/{file_name}.mp3"
@@ -116,7 +111,15 @@ class Speaker:
         speed_coef = min(MAX_SPEED, max(MIN_SPEED, speed_coef))
         debug_notify(f"speedup: {speed_coef}")
 
-        os.system(f'mpv --speed={speed_coef} --no-resume-playback "{audio_file_pp}"')
+        try:
+            proc = subprocess.Popen(['mpv', f'--speed={speed_coef}', '--no-resume-playback', audio_file_pp])
+            signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
+            proc.wait()
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        except KeyboardInterrupt:
+            proc.terminate()
+        finally:
+            proc.terminate()
         lock_file.unlink()
         os.remove(audio_file_pp)
 
@@ -124,7 +127,7 @@ class Speaker:
 class Alice(Speaker):
     def __init__(self):
         self.unique_name = "Alice"
-        self.ff_rate_coef = 1.05
+        self.ff_rate_coef = 1.08
         self.ff_tempo = 1.0
         self.voice = texttospeech.VoiceSelectionParams(
             name = "en-US-Wavenet-H",
@@ -137,40 +140,17 @@ class Alice(Speaker):
             pitch = 0.6,
             volume_gain_db = 0,
             sample_rate_hertz = 44100,
-            #"effectsProfileId": [
-            #    string
-            #]
         )
-
-class Test(Speaker):
-    def __init__(self):
-        self.ff_rate_coef = 1.20
-        self.ff_tempo = 1.00
-        self.voice = texttospeech.VoiceSelectionParams(
-            name = "en-US-Wavenet-H",
-            language_code="en-US",
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
-        )
-        self.audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate = 0.8 * speak_rate,
-            pitch = 1,
-            volume_gain_db = 0,
-            sample_rate_hertz = 44100,
-            #"effectsProfileId": [
-            #    string
-            #]
-        )
-
-def main():
-    speaker = Alice()
-    speaker.speak(args.text)
 
 wait_locks = list(locks_dir.iterdir())
 lock_file.touch()
 
 pitch_coef = args.pitch if args.pitch else 1
 speak_rate = args.speed if args.speed else 1
+
+def main():
+    speaker = Alice()
+    speaker.speak(args.text)
 
 if __name__ == "__main__":
     try:
