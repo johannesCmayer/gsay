@@ -35,12 +35,10 @@ locks_dir.mkdir(exist_ok=True)
 
 api_key = yaml.load(open(project_dir / 'api_key.yaml', 'r'), Loader=yaml.FullLoader)
 
-
 # Arguments
 parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
 parser.add_argument('--speed', type=float, help="Speed of the generated voice")
 parser.add_argument('--pitch', type=float, help="Pitch of the generated voice")
-parser.add_argument('--clear-locks', action='store_true', help="Clear all the locks.")
 parser.add_argument('--debug', action='store_true', help="Activate debug mode")
 parser.add_argument('-o', '--output-file', type=Path, help="Output to this file instead of playing it.")
 parser.add_argument('text',  type=str, nargs='*', help='sum the integers (default: find the max)')
@@ -48,24 +46,8 @@ parser.add_argument('text',  type=str, nargs='*', help='sum the integers (defaul
 args = parser.parse_args()
 args.text = " ".join(args.text)
 
-if args.clear_locks:
-    for f in locks_dir.iterdir():
-        f.unlink()
-    exit(0)
-
 if args.text == "":
     raise ValueError("No text to speak was provided.")
-
-def debug_notify(msg):
-    if args.debug:
-        os.system(f"notify-send '{msg}'")
-
-def wait_for_lock():
-    for lock in wait_locks:
-        if lock.name == lock_file.name:
-            continue
-        while lock.is_file():
-            time.sleep(0.005)
 
 class Speaker:
     def __init__(self):
@@ -99,20 +81,8 @@ class Speaker:
             shutil.move(audio_file_pp, args.output_file)
             return
         
-        wait_for_lock()
-
-        # We calculate a speedup factor based on the number of sheduled files
-        # We want to catch up if there are many files sheduled for speaking.
-        MAX_SPEED = 1.3
-        MIN_SPEED = 1.0
-        UPPER_RANGE = 3
-
-        speed_coef = MIN_SPEED + (len(list(locks_dir.iterdir())) - 1) / UPPER_RANGE * (MAX_SPEED - MIN_SPEED)
-        speed_coef = min(MAX_SPEED, max(MIN_SPEED, speed_coef))
-        debug_notify(f"speedup: {speed_coef}")
-
         try:
-            proc = subprocess.Popen(['mpv', f'--speed={speed_coef}', '--no-resume-playback', audio_file_pp])
+            proc = subprocess.Popen(['mpv', audio_file_pp])
             signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
             proc.wait()
             signal.signal(signal.SIGTERM, signal.SIG_DFL)
@@ -120,8 +90,7 @@ class Speaker:
             proc.terminate()
         finally:
             proc.terminate()
-        lock_file.unlink()
-        os.remove(audio_file_pp)
+            os.remove(audio_file_pp)
 
 
 class Alice(Speaker):
@@ -136,25 +105,15 @@ class Alice(Speaker):
         )
         self.audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate = 1.4 * speak_rate,
+            speaking_rate = 1.4,
             pitch = 0.6,
             volume_gain_db = 0,
             sample_rate_hertz = 44100,
         )
-
-wait_locks = list(locks_dir.iterdir())
-lock_file.touch()
-
-pitch_coef = args.pitch if args.pitch else 1
-speak_rate = args.speed if args.speed else 1
 
 def main():
     speaker = Alice()
     speaker.speak(args.text)
 
 if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        if lock_file.is_file():
-            lock_file.unlink()
+    main()
