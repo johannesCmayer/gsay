@@ -13,6 +13,7 @@ import signal
 import time
 from glob import glob
 import subprocess
+import logging
 
 import yaml
 import click
@@ -48,13 +49,16 @@ parser.add_argument('text',  type=str, nargs='*', help='sum the integers (defaul
 args = parser.parse_args()
 args.text = " ".join(args.text)
 
+if args.text == "":
+    raise ValueError("No text to speak was provided.")
+
+if args.debug:
+    logging.getLogger().setLevel(logging.DEBUG)
+
 if args.clear_locks:
     for f in locks_dir.iterdir():
         f.unlink()
     exit(0)
-
-if args.text == "":
-    raise ValueError("No text to speak was provided.")
 
 def debug_notify(msg):
     if args.debug:
@@ -80,15 +84,17 @@ class Speaker:
         client = texttospeech.TextToSpeechClient(credentials=Credentials(api_key))
         synthesis_input = texttospeech.SynthesisInput(text=text)
 
+        logging.debug("Sending client synthesise speech request")
         response = client.synthesize_speech(
-            input=synthesis_input, voice=self.voice, audio_config=self.audio_config
-        )
+            input=synthesis_input, voice=self.voice, audio_config=self.audio_config)
+        logging.debug("Received response")
 
         if not os.path.isdir(audio_dir):
             os.mkdir(audio_dir, )
         with open(audio_file, "wb") as out:
             out.write(response.audio_content)
 
+        logging.debug("Applying nightcore with ffmpeg")
         os.system(f'ffmpeg -loglevel quiet -i "{audio_file}" '
             f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
             f'"{audio_file_pp}" -y')
