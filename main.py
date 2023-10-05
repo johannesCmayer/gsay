@@ -28,11 +28,8 @@ id = get_timestamp()
 # Paths
 project_dir = Path(os.path.dirname(os.path.realpath(__file__)))
 audio_dir = project_dir / 'audio_file_cache'
-locks_dir = project_dir / 'locks'
-lock_file = locks_dir / id
 
 audio_dir.mkdir(exist_ok=True)
-locks_dir.mkdir(exist_ok=True)
 
 api_key = yaml.load(open(project_dir / 'api_key.yaml', 'r'), Loader=yaml.FullLoader)
 
@@ -83,7 +80,6 @@ class Speaker:
         os.remove(audio_file)
 
         if args.output_file is not None:
-            lock_file.unlink()
             shutil.move(audio_file_pp, args.output_file)
             return
         
