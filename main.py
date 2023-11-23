@@ -1,6 +1,4 @@
-"""Synthesizes speech from the input string of text or ssml.
-Make sure to be working in a virtual environment.
-
+"""
 Note: ssml must be well-formed according to:
     https://www.w3.org/TR/speech-synthesis/
 """
@@ -14,6 +12,7 @@ import time
 from glob import glob
 import subprocess
 import logging
+from abc import ABC, abstractmethod
 
 import yaml
 import click
@@ -50,9 +49,13 @@ if args.text == "":
 if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
 
-class Speaker:
+class Speaker(ABC):
     def __init__(self):
-        pass
+        self.unique_name = None
+        self.ff_rate_coef = None
+        self.ff_tempo = None
+        self.voice = None
+        self.audio_config = None
 
     def speak(self, text=None):
         file_name = id
@@ -82,18 +85,20 @@ class Speaker:
         if args.output_file is not None:
             shutil.move(audio_file_pp, args.output_file)
             return
-        
+
+        proc = None
         try:
             proc = subprocess.Popen(['mpv', audio_file_pp])
             signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
             proc.wait()
             signal.signal(signal.SIGTERM, signal.SIG_DFL)
         except KeyboardInterrupt:
-            proc.terminate()
+            if proc:
+                proc.terminate()
         finally:
-            proc.terminate()
+            if proc:
+                proc.terminate()
             os.remove(audio_file_pp)
-
 
 class Alice(Speaker):
     def __init__(self):
