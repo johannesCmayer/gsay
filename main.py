@@ -44,7 +44,7 @@ args = parser.parse_args()
 args.text = " ".join(args.text)
 
 if args.text == "":
-    raise ValueError("No text to speak was provided.")
+    exit(0)
 
 if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
