@@ -38,13 +38,12 @@ parser.add_argument('--speed', type=float, help="Speed of the generated voice")
 parser.add_argument('--pitch', type=float, help="Pitch of the generated voice")
 parser.add_argument('--debug', action='store_true', help="Activate debug mode")
 parser.add_argument('-o', '--output-file', type=Path, help="Output to this file instead of playing it.")
-parser.add_argument('text',  type=str, nargs='*', help='sum the integers (default: find the max)')
+parser.add_argument('--ssml',  type=str, help='The next to speak as ssml annotated text.')
+parser.add_argument('--speaker',  type=str, default="Alice", help='The speaker to use.')
+parser.add_argument('text',  type=str, nargs='*', help='The next to speak.')
 
 args = parser.parse_args()
 args.text = " ".join(args.text)
-
-if args.text == "":
-    exit(0)
 
 if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
@@ -57,14 +56,19 @@ class Speaker(ABC):
         self.voice = None
         self.audio_config = None
 
-    def speak(self, text=None):
+    def speak(self, text=None, ssml=None):
         file_name = id
 
         audio_file = f"{audio_dir}/{file_name}.mp3"
         audio_file_pp = f"{audio_dir}/{file_name}_pp.mp3"
 
         client = texttospeech.TextToSpeechClient(credentials=Credentials(api_key))
-        synthesis_input = texttospeech.SynthesisInput(text=text)
+        if text:
+            synthesis_input = texttospeech.SynthesisInput(text=text)
+        elif ssml:
+            synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
+        else:
+            return
 
         logging.debug("Sending client synthesise speech request")
         response = client.synthesize_speech(
@@ -88,7 +92,7 @@ class Speaker(ABC):
 
         proc = None
         try:
-            proc = subprocess.Popen(['mpv', audio_file_pp])
+            proc = subprocess.Popen(['mpv', '--really-quiet', audio_file_pp])
             signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
             proc.wait()
             signal.signal(signal.SIGTERM, signal.SIG_DFL)
@@ -101,8 +105,8 @@ class Speaker(ABC):
             os.remove(audio_file_pp)
 
 class Alice(Speaker):
+    unique_name = "Alice"
     def __init__(self):
-        self.unique_name = "Alice"
         self.ff_rate_coef = 1.08
         self.ff_tempo = 1.0
         self.voice = texttospeech.VoiceSelectionParams(
@@ -118,9 +122,35 @@ class Alice(Speaker):
             sample_rate_hertz = 44100,
         )
 
+class Mary(Speaker):
+    unique_name = "Mary"
+    def __init__(self):
+        "ACF"
+        self.ff_rate_coef = 1.185
+        self.ff_tempo = 1.0
+        self.voice = texttospeech.VoiceSelectionParams(
+            name = "en-GB-Neural2-A",
+            language_code="en-GB",
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
+        )
+        self.audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3,
+            speaking_rate = 1.2,
+            pitch = 0.6,
+            volume_gain_db = 1.5,
+            sample_rate_hertz = 44100,
+        )
+
 def main():
-    speaker = Alice()
-    speaker.speak(args.text)
+    speaker = None
+    for s in [Alice, Mary]:
+        if s.unique_name == args.speaker:
+            speaker = s
+            break
+    else:
+        raise Exception(f"Speaker {args.speaker} not found.")
+    speaker = s()
+    speaker.speak(args.text, args.ssml)
 
 if __name__ == "__main__":
     main()
