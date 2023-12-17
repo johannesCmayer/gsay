@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 import yaml
 from google.cloud import texttospeech
 from google.auth.api_key import Credentials
+from xdg_base_dirs import xdg_config_home
 
 def get_timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
@@ -30,7 +31,8 @@ audio_dir = project_dir / 'audio_file_cache'
 
 audio_dir.mkdir(exist_ok=True)
 
-api_key = yaml.load(open(project_dir / 'api_key.yaml', 'r'), Loader=yaml.FullLoader)
+api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
+api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
 
 # Arguments
 parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
@@ -148,5 +150,5 @@ class SpeakerEnum(Enum):
 def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE):
     speaker.value().speak(msg, ssml)
 
-def cli_main():
+def main():
     speak(args.text, args.ssml, speaker=SpeakerEnum[args.speaker.upper()])
