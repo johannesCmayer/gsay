@@ -2,6 +2,7 @@
 Note: ssml must be well-formed according to:
     https://www.w3.org/TR/speech-synthesis/
 """
+from enum import Enum
 from pathlib import Path
 import os
 import argparse
@@ -15,7 +16,6 @@ import logging
 from abc import ABC, abstractmethod
 
 import yaml
-import click
 from google.cloud import texttospeech
 from google.auth.api_key import Credentials
 
@@ -141,16 +141,12 @@ class Mary(Speaker):
             sample_rate_hertz = 44100,
         )
 
-def main():
-    speaker = None
-    for s in [Alice, Mary]:
-        if s.unique_name == args.speaker:
-            speaker = s
-            break
-    else:
-        raise Exception(f"Speaker {args.speaker} not found.")
-    speaker = s()
-    speaker.speak(args.text, args.ssml)
+class SpeakerEnum(Enum):
+    ALICE = Alice
+    MARY = Mary
 
-if __name__ == "__main__":
-    main()
+def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE):
+    speaker.value().speak(msg, ssml)
+
+def cli_main():
+    speak(args.text, args.ssml, speaker=SpeakerEnum[args.speaker.upper()])

@@ -3,3 +3,4 @@ audio_file_cache
 locks/
 client_secret_*.json
 api_key.yaml
+__pycache__/
