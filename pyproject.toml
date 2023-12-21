@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "gsay"
-version = "0.1.4-dev"
-description = "Nightcored Google TTS"
+version = "0.1.5"
+description = "Nightcored Google TTS."
 authors = ["Johannes C. Mayer <j.c.mayer240@gmail.com>"]
 license = "MIT"
 readme = "README.md"

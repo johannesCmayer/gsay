@@ -4,3 +4,4 @@ locks/
 client_secret_*.json
 api_key.yaml
 __pycache__/
+dist/
