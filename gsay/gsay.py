@@ -5,11 +5,9 @@ Note: ssml must be well-formed according to:
 from enum import Enum
 from pathlib import Path
 import os
-import argparse
 import datetime
 import shutil
 import signal
-import time
 from glob import glob
 import subprocess
 import logging
@@ -34,29 +32,14 @@ audio_dir.mkdir(exist_ok=True)
 api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
 api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
 
-# Arguments
-parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
-parser.add_argument('--speed', type=float, help="Speed of the generated voice")
-parser.add_argument('--pitch', type=float, help="Pitch of the generated voice")
-parser.add_argument('--debug', action='store_true', help="Activate debug mode")
-parser.add_argument('-o', '--output-file', type=Path, help="Output to this file instead of playing it.")
-parser.add_argument('--ssml',  type=str, help='The next to speak as ssml annotated text.')
-parser.add_argument('--speaker',  type=str, default="Alice", help='The speaker to use.')
-parser.add_argument('text',  type=str, nargs='*', help='The next to speak.')
-
-args = parser.parse_args()
-args.text = " ".join(args.text)
-
-if args.debug:
-    logging.getLogger().setLevel(logging.DEBUG)
-
 class Speaker(ABC):
-    def __init__(self):
+    def __init__(self, unique_name=None, ff_rate_coef=None, ff_tempo=None, voice=None, audio_config=None, output_file=None):
         self.unique_name = None
         self.ff_rate_coef = None
         self.ff_tempo = None
         self.voice = None
         self.audio_config = None
+        self.output_file = None
 
     def speak(self, text=None, ssml=None):
         file_name = id
@@ -88,8 +71,8 @@ class Speaker(ABC):
             f'"{audio_file_pp}" -y')
         os.remove(audio_file)
 
-        if args.output_file is not None:
-            shutil.move(audio_file_pp, args.output_file)
+        if self.output_file:
+            shutil.move(audio_file_pp, self.output_file)
             return
 
         proc = None
@@ -108,7 +91,8 @@ class Speaker(ABC):
 
 class Alice(Speaker):
     unique_name = "Alice"
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.ff_rate_coef = 1.08
         self.ff_tempo = 1.0
         self.voice = texttospeech.VoiceSelectionParams(
@@ -126,8 +110,8 @@ class Alice(Speaker):
 
 class Mary(Speaker):
     unique_name = "Mary"
-    def __init__(self):
-        "ACF"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.ff_rate_coef = 1.185
         self.ff_tempo = 1.0
         self.voice = texttospeech.VoiceSelectionParams(
@@ -147,8 +131,6 @@ class SpeakerEnum(Enum):
     ALICE = Alice
     MARY = Mary
 
-def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE):
-    speaker.value().speak(msg, ssml)
-
-def main():
-    speak(args.text, args.ssml, speaker=SpeakerEnum[args.speaker.upper()])
+def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE, output_file=None):
+    speaker_instance = speaker.value(output_file=output_file)
+    speaker_instance.speak(msg, ssml)

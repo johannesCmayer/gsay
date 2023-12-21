@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "gsay"
-version = "0.1.6"
+version = "0.1.7"
 description = "Nightcored Google TTS."
 authors = ["Johannes C. Mayer <j.c.mayer240@gmail.com>"]
 license = "MIT"
 readme = "PYPI_README.md"
 
 [tool.poetry.scripts]
-gsay = "gsay:main"
+gsay = "gsay.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
