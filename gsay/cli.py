@@ -20,7 +20,7 @@ if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
-    speak(args.text, args.ssml, speaker=SpeakerEnum[args.speaker.upper()])
+    speak(args.text, args.ssml, speaker=SpeakerEnum[args.speaker.upper()], output_file=args.output_file)
 
 if __name__ == "__main__":
     main()

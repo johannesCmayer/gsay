@@ -33,13 +33,13 @@ api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
 api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
 
 class Speaker(ABC):
-    def __init__(self, unique_name=None, ff_rate_coef=None, ff_tempo=None, voice=None, audio_config=None, output_file=None):
-        self.unique_name = None
-        self.ff_rate_coef = None
-        self.ff_tempo = None
-        self.voice = None
-        self.audio_config = None
-        self.output_file = None
+    def __init__(self, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
+        self.unique_name = unique_name
+        self.ff_rate_coef = ff_rate_coef
+        self.ff_tempo = ff_tempo
+        self.voice = voice
+        self.audio_config = audio_config
+        self.output_file = output_file
 
     def speak(self, text=None, ssml=None):
         file_name = id
