@@ -127,7 +127,8 @@ def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE, 
 
     # Paths
     project_dir = Path(os.path.dirname(os.path.realpath(__file__)))
-    audio_dir = project_dir / 'audio_file_cache'
+    audio_dir = Path('/tmp/gsay')
+    audio_dir.mkdir(exist_ok=True)
 
     audio_dir.mkdir(exist_ok=True)
 
