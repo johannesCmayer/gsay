@@ -6,4 +6,4 @@ api_key.yaml
 __pycache__/
 dist/
 .direnv/
-result/
+result
