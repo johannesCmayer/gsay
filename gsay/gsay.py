@@ -21,19 +21,10 @@ from xdg_base_dirs import xdg_config_home
 def get_timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
 
-id = get_timestamp()
-
-# Paths
-project_dir = Path(os.path.dirname(os.path.realpath(__file__)))
-audio_dir = project_dir / 'audio_file_cache'
-
-audio_dir.mkdir(exist_ok=True)
-
-api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
-api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
-
 class Speaker(ABC):
-    def __init__(self, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
+    def __init__(self, audio_dir, api_key, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
+        self.audio_dir = audio_dir
+        self.api_key = api_key
         self.unique_name = unique_name
         self.ff_rate_coef = ff_rate_coef
         self.ff_tempo = ff_tempo
@@ -44,10 +35,10 @@ class Speaker(ABC):
     def speak(self, text=None, ssml=None):
         file_name = id
 
-        audio_file = f"{audio_dir}/{file_name}.mp3"
-        audio_file_pp = f"{audio_dir}/{file_name}_pp.mp3"
+        audio_file = f"{self.audio_dir}/{file_name}.mp3"
+        audio_file_pp = f"{self.audio_dir}/{file_name}_pp.mp3"
 
-        client = texttospeech.TextToSpeechClient(credentials=Credentials(api_key))
+        client = texttospeech.TextToSpeechClient(credentials=Credentials(self.api_key))
         if text:
             synthesis_input = texttospeech.SynthesisInput(text=text)
         elif ssml:
@@ -60,8 +51,8 @@ class Speaker(ABC):
             input=synthesis_input, voice=self.voice, audio_config=self.audio_config)
         logging.debug("Received response")
 
-        if not os.path.isdir(audio_dir):
-            os.mkdir(audio_dir, )
+        if not os.path.isdir(self.audio_dir):
+            os.mkdir(self.audio_dir, )
         with open(audio_file, "wb") as out:
             out.write(response.audio_content)
 
@@ -132,5 +123,16 @@ class SpeakerEnum(Enum):
     MARY = Mary
 
 def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE, output_file=None):
-    speaker_instance = speaker.value(output_file=output_file)
+    id = get_timestamp()
+
+    # Paths
+    project_dir = Path(os.path.dirname(os.path.realpath(__file__)))
+    audio_dir = project_dir / 'audio_file_cache'
+
+    audio_dir.mkdir(exist_ok=True)
+
+    api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
+    api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
+
+    speaker_instance = speaker.value(audio_dir, api_key, output_file=output_file)
     speaker_instance.speak(msg, ssml)
