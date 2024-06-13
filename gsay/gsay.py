@@ -12,6 +12,7 @@ from glob import glob
 import subprocess
 import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import yaml
 from google.cloud import texttospeech
@@ -20,6 +21,21 @@ from xdg_base_dirs import xdg_config_home
 
 def get_timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+
+def play_audio_file(audio_file):
+    proc = None
+    try:
+        proc = subprocess.Popen(['mpv', '--really-quiet', str(audio_file)])
+        signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
+        proc.wait()
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    except KeyboardInterrupt:
+        if proc:
+            proc.terminate()
+    finally:
+        if proc:
+            proc.terminate()
+        audio_file.unlink(missing_ok=True)
 
 class Speaker(ABC):
     def __init__(self, audio_dir, api_key, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
@@ -35,8 +51,8 @@ class Speaker(ABC):
     def speak(self, text=None, ssml=None):
         file_name = id
 
-        audio_file = f"{self.audio_dir}/{file_name}.mp3"
-        audio_file_pp = f"{self.audio_dir}/{file_name}_pp.mp3"
+        audio_file = Path(f"{self.audio_dir}/{file_name}.mp3")
+        audio_file_nightcored = Path(f"{self.audio_dir}/{file_name}_pp.mp3")
 
         client = texttospeech.TextToSpeechClient(credentials=Credentials(self.api_key))
         if text:
@@ -53,32 +69,21 @@ class Speaker(ABC):
 
         if not os.path.isdir(self.audio_dir):
             os.mkdir(self.audio_dir, )
-        with open(audio_file, "wb") as out:
+        with audio_file.open("wb") as out:
             out.write(response.audio_content)
 
         logging.debug("Applying nightcore with ffmpeg")
         os.system(f'ffmpeg -loglevel quiet -i "{audio_file}" '
             f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
-            f'"{audio_file_pp}" -y')
-        os.remove(audio_file)
+            f'"{audio_file_nightcored}" -y')
+        audio_file.unlink()
 
         if self.output_file:
-            shutil.move(audio_file_pp, self.output_file)
+            audio_file_nightcored.rename(self.output_file)
             return
+        
+        play_audio_file(audio_file_nightcored)
 
-        proc = None
-        try:
-            proc = subprocess.Popen(['mpv', '--really-quiet', audio_file_pp])
-            signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
-            proc.wait()
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        except KeyboardInterrupt:
-            if proc:
-                proc.terminate()
-        finally:
-            if proc:
-                proc.terminate()
-            os.remove(audio_file_pp)
 
 class Alice(Speaker):
     unique_name = "Alice"
@@ -128,8 +133,6 @@ def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE, 
     # Paths
     project_dir = Path(os.path.dirname(os.path.realpath(__file__)))
     audio_dir = Path('/tmp/gsay')
-    audio_dir.mkdir(exist_ok=True)
-
     audio_dir.mkdir(exist_ok=True)
 
     api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
