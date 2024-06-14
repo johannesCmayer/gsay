@@ -33,12 +33,13 @@ def main():
 
 def process_stream():
     for line in sys.stdin:
+        line = line.rstrip('\n')
         process_blob(line, "")
 
 def process_blob(text=args.text, ssml=args.ssml, speaker=SpeakerEnum[args.speaker.upper()], output_file=args.output_file):
     if args.echo:
         if text:
-            print(text.strip())
+            print(text)
         if ssml:
             print(ssml)
     speak(text, ssml, speaker, output_file)
