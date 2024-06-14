@@ -38,7 +38,7 @@ def process_stream():
 def process_blob(text=args.text, ssml=args.ssml, speaker=SpeakerEnum[args.speaker.upper()], output_file=args.output_file):
     if args.echo:
         if text:
-            print(args.text)
+            print(text)
         if ssml:
-            print(args.ssml)
+            print(ssml)
     speak(text, ssml, speaker, output_file)
