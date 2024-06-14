@@ -2,6 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 from gsay.gsay import SpeakerEnum, speak
+import sys
 
 # Arguments
 parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
@@ -21,9 +22,19 @@ if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
+    if not args.text and not args.ssml:
+        process_stream()
+    else:
+        process_blob()
+
+def process_stream():
+    for line in sys.stdin:
+        process_blob(line, "")
+
+def process_blob(text=args.text, ssml=args.ssml, speaker=SpeakerEnum[args.speaker.upper()], output_file=args.output_file):
     if args.echo:
         if args.text:
             print(args.text)
         if args.ssml:
             print(args.ssml)
-    speak(args.text, args.ssml, speaker=SpeakerEnum[args.speaker.upper()], output_file=args.output_file)
+    speak(text, ssml, speaker, output_file)
