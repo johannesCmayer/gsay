@@ -5,7 +5,8 @@ from gsay.gsay import SpeakerEnum, speak
 import sys
 
 # Arguments
-parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored.')
+parser = argparse.ArgumentParser(description='Google Text to speech. Nightcored. By default stdin is only processed if neither `text` nor `--ssml` is provided.')
+parser.add_argument('--stdin', action='store_true', help="Speak first command line args then stdin.")
 parser.add_argument('--speed', type=float, help="Speed of the generated voice")
 parser.add_argument('--pitch', type=float, help="Pitch of the generated voice")
 parser.add_argument('--debug', action='store_true', help="Activate debug mode")
@@ -22,10 +23,13 @@ if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
-    if not args.text and not args.ssml:
+    # If we don't get any other input try to process stdin
+    if not (args.text or args.ssml):
         process_stream()
     else:
         process_blob()
+        if args.stdin:
+            process_stream()
 
 def process_stream():
     for line in sys.stdin:
