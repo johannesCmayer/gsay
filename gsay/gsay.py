@@ -2,6 +2,7 @@
 Note: ssml must be well-formed according to:
     https://www.w3.org/TR/speech-synthesis/
 """
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 import os
@@ -150,6 +151,15 @@ class Mary(Speaker):
             volume_gain_db = 1.5,
             sample_rate_hertz = 44100,
         )
+
+# @dataclass
+# class SpeakerConfig:
+#     unique_name : str
+#     ff_rate_coef : float
+#     ff_tempo : float
+#     voice : texttospeech.VoiceSelectionParams
+#     audio_config : texttospeech.AudioConfig
+
 
 class SpeakerEnum(Enum):
     ALICE = Alice
