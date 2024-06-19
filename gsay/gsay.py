@@ -2,21 +2,25 @@
 Note: ssml must be well-formed according to:
     https://www.w3.org/TR/speech-synthesis/
 """
+
+#TODO: Have the cache also take into account how often a particular file has been retrieved from the cache when deleting files.
+#TODO: Add cli flag that disables caching for the particular invocation.
+
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 import os
-import datetime
-import shutil
 import signal
 from glob import glob
 import subprocess
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-import io
 import tempfile
 import logging
-import argparse
+import hashlib
+import os
+from datetime import datetime
 
 import yaml
 from google.cloud import texttospeech
@@ -24,9 +28,8 @@ from google.auth.api_key import Credentials
 from xdg_base_dirs import xdg_config_home, xdg_cache_home
 
 audio_file_cache_dir = xdg_cache_home() / 'gsay'
-
-def get_timestamp():
-    return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+# n most recently accessed files to keep in the audio-file cache.
+cache_size = 1000
 
 def play_audio_file(audio_file):
     proc = None
@@ -43,8 +46,26 @@ def play_audio_file(audio_file):
         if proc:
             proc.terminate()
 
+def seconds_since_last_access(path : Path):
+    last_access_time = path.stat().st_atime
+    last_access_datetime = datetime.fromtimestamp(last_access_time)
+    current_datetime = datetime.now()
+    time_difference = current_datetime - last_access_datetime
+    seconds_since_list_access = time_difference.seconds
+    return seconds_since_list_access
+
+def get_file_content_hash(msg : str, speaker : str):
+    return hashlib.sha256(f"{msg}{speaker}".encode()).hexdigest()
+
 def calculate_cache_path(msg : str, speaker : str):
-    return audio_file_cache_dir / f"{msg}__{speaker}.mp3"
+    return audio_file_cache_dir / f"{get_file_content_hash(msg, speaker)}.mp3"
+
+def clean_cache():
+    files = list(audio_file_cache_dir.iterdir())
+    files = sorted(files, key=lambda x: seconds_since_last_access(x))
+    for f in files[cache_size:]:
+        f.unlink()
+    logging.debug(f"Deleted {len(files) - cache_size} files from the cache.")
 
 def fetch_audiofile_from_cache(msg : str, speaker : str) -> Path:
     cache_file = calculate_cache_path(msg, speaker)
@@ -53,10 +74,9 @@ def fetch_audiofile_from_cache(msg : str, speaker : str) -> Path:
         return cache_file
     else:
         return None
-
+    
 class Speaker(ABC):
-    def __init__(self, audio_dir, api_key, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
-        self.audio_dir = audio_dir
+    def __init__(self, api_key, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
         self.api_key = api_key
         self.unique_name = unique_name
         self.ff_rate_coef = ff_rate_coef
@@ -97,8 +117,10 @@ class Speaker(ABC):
         audio_file = fetch_audiofile_from_cache(text, speaker=self.unique_name)
         # Generate and immediately cache the file if it does not exist
         if not audio_file:
+            clean_cache()
             audio_file_cache_dir.mkdir(exist_ok=True)
             cache_file = calculate_cache_path(text if is_text else ssml, self.unique_name)
+            print(cache_file)
             audio_file = self._generate_audio_file(text, ssml, cache_file)
         
         return audio_file
@@ -114,9 +136,9 @@ class Speaker(ABC):
 
 
 class Alice(Speaker):
-    unique_name = "Alice"
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.unique_name = "Alice"
         self.ff_rate_coef = 1.08
         self.ff_tempo = 1.0
         self.voice = texttospeech.VoiceSelectionParams(
@@ -133,9 +155,9 @@ class Alice(Speaker):
         )
 
 class Mary(Speaker):
-    unique_name = "Mary"
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.unique_name = "Mary"
         self.ff_rate_coef = 1.185
         self.ff_tempo = 1.0
         self.voice = texttospeech.VoiceSelectionParams(
@@ -151,20 +173,23 @@ class Mary(Speaker):
             sample_rate_hertz = 44100,
         )
 
+# @dataclass
+# class SpeakerConfig:
+#     unique_name : str
+#     ff_rate_coef : float
+#     ff_tempo : float
+#     voice : texttospeech.VoiceSelectionParams
+#     audio_config : texttospeech.AudioConfig
+
+
 class SpeakerEnum(Enum):
     ALICE = Alice
     MARY = Mary
 
 def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE, output_file=None):
-    id = get_timestamp()
-
     # Paths
-    project_dir = Path(os.path.dirname(os.path.realpath(__file__)))
-    audio_dir = Path('/tmp/gsay')
-    audio_dir.mkdir(exist_ok=True)
-
     api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
     api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
 
-    speaker_instance = speaker.value(audio_dir, api_key, output_file=output_file)
+    speaker_instance = speaker.value(api_key, output_file=output_file)
     speaker_instance.speak(msg, ssml)
