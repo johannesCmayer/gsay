@@ -13,17 +13,24 @@ import subprocess
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
+import io
+import tempfile
+import logging
+import argparse
 
 import yaml
 from google.cloud import texttospeech
 from google.auth.api_key import Credentials
-from xdg_base_dirs import xdg_config_home
+from xdg_base_dirs import xdg_config_home, xdg_cache_home
+
+audio_file_cache_dir = xdg_cache_home() / 'gsay'
 
 def get_timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
 
 def play_audio_file(audio_file):
     proc = None
+
     try:
         proc = subprocess.Popen(['mpv', '--really-quiet', str(audio_file)])
         signal.signal(signal.SIGTERM, lambda signum, frame: proc.terminate())
@@ -35,7 +42,17 @@ def play_audio_file(audio_file):
     finally:
         if proc:
             proc.terminate()
-        audio_file.unlink(missing_ok=True)
+
+def calculate_cache_path(msg : str, speaker : str):
+    return audio_file_cache_dir / f"{msg}__{speaker}.mp3"
+
+def fetch_audiofile_from_cache(msg : str, speaker : str) -> Path:
+    cache_file = calculate_cache_path(msg, speaker)
+    if cache_file.exists():
+        logging.debug(f"Cache hit for speaker {speaker} saying \"{msg}\"")
+        return cache_file
+    else:
+        return None
 
 class Speaker(ABC):
     def __init__(self, audio_dir, api_key, unique_name=None, ff_rate_coef=1, ff_tempo=1, voice=None, audio_config=None, output_file=None):
@@ -48,41 +65,52 @@ class Speaker(ABC):
         self.audio_config = audio_config
         self.output_file = output_file
 
+    def _generate_audio_file(self, text, ssml, target_file_path : Path):
+        logging.debug(f"Generating new audio file.")
+
+        with tempfile.NamedTemporaryFile() as audio_file:
+            client = texttospeech.TextToSpeechClient(credentials=Credentials(self.api_key))
+            if text:
+                synthesis_input = texttospeech.SynthesisInput(text=text)
+            elif ssml:
+                synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
+            else:
+                raise Exception("Both text and ssml are None.")
+
+            logging.debug("Sending client synthesise speech request")
+            response = client.synthesize_speech(
+                input=synthesis_input, voice=self.voice, audio_config=self.audio_config)
+            logging.debug("Received response")
+
+            audio_file.write(response.audio_content)
+
+            logging.debug("Applying nightcore with ffmpeg")
+            os.system(f'ffmpeg -loglevel quiet -i "{audio_file.name}" '
+                f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
+                f'"{target_file_path}" -y')
+
+        return target_file_path
+
+    def get_audio_file(self, text=None, ssml=None):
+        is_text = ssml == None
+
+        audio_file = fetch_audiofile_from_cache(text, speaker=self.unique_name)
+        # Generate and immediately cache the file if it does not exist
+        if not audio_file:
+            audio_file_cache_dir.mkdir(exist_ok=True)
+            cache_file = calculate_cache_path(text if is_text else ssml, self.unique_name)
+            audio_file = self._generate_audio_file(text, ssml, cache_file)
+        
+        return audio_file
+
     def speak(self, text=None, ssml=None):
-        file_name = id
-
-        audio_file = Path(f"{self.audio_dir}/{file_name}.mp3")
-        audio_file_nightcored = Path(f"{self.audio_dir}/{file_name}_pp.mp3")
-
-        client = texttospeech.TextToSpeechClient(credentials=Credentials(self.api_key))
-        if text:
-            synthesis_input = texttospeech.SynthesisInput(text=text)
-        elif ssml:
-            synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
-        else:
-            return
-
-        logging.debug("Sending client synthesise speech request")
-        response = client.synthesize_speech(
-            input=synthesis_input, voice=self.voice, audio_config=self.audio_config)
-        logging.debug("Received response")
-
-        if not os.path.isdir(self.audio_dir):
-            os.mkdir(self.audio_dir, )
-        with audio_file.open("wb") as out:
-            out.write(response.audio_content)
-
-        logging.debug("Applying nightcore with ffmpeg")
-        os.system(f'ffmpeg -loglevel quiet -i "{audio_file}" '
-            f'-filter:a "atempo={self.ff_tempo},asetrate=44100*{self.ff_rate_coef}" '
-            f'"{audio_file_nightcored}" -y')
-        audio_file.unlink()
+        audio_file = self.get_audio_file(text, ssml)
 
         if self.output_file:
-            audio_file_nightcored.rename(self.output_file)
+            self.output_file.write_bytes(audio_file.read_bytes())
             return
-        
-        play_audio_file(audio_file_nightcored)
+        else:
+            play_audio_file(audio_file)
 
 
 class Alice(Speaker):

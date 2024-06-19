@@ -5,10 +5,10 @@ pkgs.python310Packages.buildPythonPackage rec {
   src = ./.;
   propagatedBuildInputs = with pkgs.python310Packages; [
     pkgs.python310
+    ffmpeg-python
     pyyaml
     xdg-base-dirs
     rich
     google-cloud-texttospeech
-    pkgs.ffmpeg
   ];
 }

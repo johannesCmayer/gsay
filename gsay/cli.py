@@ -13,8 +13,15 @@ parser.add_argument('--debug', action='store_true', help="Activate debug mode")
 parser.add_argument('-o', '--output-file', type=Path, help="Output to this file instead of playing it.")
 parser.add_argument('--ssml',  type=str, help='The next to speak as ssml annotated text.')
 parser.add_argument('--speaker',  type=str, default="Alice", help='The speaker to use.')
-parser.add_argument('text',  type=str, nargs='*', help='The next to speak.')
 parser.add_argument('-e', '--echo',  action='store_true', help='Print the input test to stdout.')
+parser.add_argument('--log-level', default='WARNING', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                    help='Set the logging level')
+parser.add_argument('text',  type=str, nargs='*', help='The next to speak.')
+
+args = parser.parse_args()
+
+log_level = getattr(logging, args.log.upper(), None)
+logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 args = parser.parse_args()
 args.text = " ".join(args.text)
