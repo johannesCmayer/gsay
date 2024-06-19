@@ -20,7 +20,7 @@ parser.add_argument('text',  type=str, nargs='*', help='The next to speak.')
 
 args = parser.parse_args()
 
-log_level = getattr(logging, args.log.upper(), None)
+log_level = getattr(logging, args.log_level.upper(), None)
 logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 args = parser.parse_args()
