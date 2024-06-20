@@ -62,15 +62,19 @@ def calculate_cache_path(msg : str, speaker : str):
 
 def clean_cache():
     files = list(audio_file_cache_dir.iterdir())
+    # Don't delete files from the past 2 days
+    files = filter(lambda x: seconds_since_last_access(x) < 60*60*24*2, files)
     files = sorted(files, key=lambda x: seconds_since_last_access(x))
+    i = 0
     for f in files[cache_size:]:
         f.unlink()
-    logging.debug(f"Deleted {len(files) - cache_size} files from the cache.")
+        i += 1
+    logging.debug(f"Deleted {i} files from the cache.")
 
 def fetch_audiofile_from_cache(msg : str, speaker : str) -> Path:
     cache_file = calculate_cache_path(msg, speaker)
     if cache_file.exists():
-        logging.debug(f"Cache hit for speaker {speaker} saying \"{msg}\"")
+        logging.debug(f"Cache hit for speaker {speaker} saying \"{msg}\". Using {cache_file}")
         return cache_file
     else:
         return None
@@ -120,7 +124,6 @@ class Speaker(ABC):
             clean_cache()
             audio_file_cache_dir.mkdir(exist_ok=True)
             cache_file = calculate_cache_path(text if is_text else ssml, self.unique_name)
-            print(cache_file)
             audio_file = self._generate_audio_file(text, ssml, cache_file)
         
         return audio_file
