@@ -31,10 +31,7 @@ args.text = " ".join(args.text)
 if args.debug:
     logging.getLogger().setLevel(logging.DEBUG)
 
-# USE PORTALOCKERichat
-
 def main():
-    # If we don't get any other input try to process stdin
     if args.disable_lock:
         dispatch()
     else:
@@ -44,6 +41,7 @@ def main():
             portalocker.unlock(file)
 
 def dispatch():
+    # If we don't get any other input try to process stdin
     if not (args.text or args.ssml):
         process_stream()
     else:
