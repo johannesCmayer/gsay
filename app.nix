@@ -10,5 +10,6 @@ pkgs.python310Packages.buildPythonPackage rec {
     xdg-base-dirs
     rich
     google-cloud-texttospeech
+    portalocker
   ];
 }
