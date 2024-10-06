@@ -191,6 +191,7 @@ class SpeakerEnum(Enum):
 
 def speak(msg: str, ssml: str = None, speaker: SpeakerEnum = SpeakerEnum.ALICE, output_file=None):
     # Paths
+    audio_file_cache_dir.mkdir(exist_ok=True)
     api_key_path = xdg_config_home() / "gsay" / 'api_key.yaml'
     api_key = yaml.load(api_key_path.open(), Loader=yaml.FullLoader)
 
